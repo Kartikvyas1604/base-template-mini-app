@@ -25,7 +25,7 @@ export default function ConnectPage() {
   const handleNFCConnect = (data: NFCData) => {
     console.log('NFC connected:', data)
     setTimeout(() => {
-      router.push(`/session?method=nfc&peer=${encodeURIComponent(data.id)}`)
+      router.push(`/session?method=nfc&peer=${encodeURIComponent(data.address)}&sessionId=${data.sessionId}`)
     }, 1000)
   }
 

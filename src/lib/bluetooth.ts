@@ -1,55 +1,94 @@
 export interface BluetoothDevice {
   id: string
   name: string
+  address?: string
 }
 
-const SERVICE_UUID = '12345678-1234-1234-1234-123456789abc'
-const CHARACTERISTIC_UUID = '87654321-4321-4321-4321-cba987654321'
+// TapMint Custom Service UUID
+const SERVICE_UUID = '0000fff0-0000-1000-8000-00805f9b34fb'
+const CHARACTERISTIC_UUID = '0000fff1-0000-1000-8000-00805f9b34fb'
 
 export const isBluetoothAvailable = () => {
-  return typeof navigator !== 'undefined' && 'bluetooth' in navigator
+  if (typeof navigator === 'undefined' || !('bluetooth' in navigator)) {
+    return false
+  }
+  return true
 }
 
 export const requestBluetoothDevice = async (): Promise<BluetoothDevice> => {
   if (!isBluetoothAvailable()) {
-    throw new Error('Bluetooth not supported on this device')
+    throw new Error('Bluetooth not supported on this device. Please use Chrome/Edge on desktop or Android.')
   }
 
   try {
+    // Request any Bluetooth device
     const device = await navigator.bluetooth.requestDevice({
+      // Accept all devices to find other TapMint users
       acceptAllDevices: true,
-      optionalServices: [SERVICE_UUID]
+      optionalServices: [SERVICE_UUID, 'battery_service', 'device_information']
     })
 
     if (!device.name) {
-      throw new Error('Device name not available')
+      throw new Error('Device name not available. Please try again.')
     }
 
-    return {
+    // Get device info
+    const deviceInfo: BluetoothDevice = {
       id: device.id,
-      name: device.name
+      name: device.name,
+      address: device.name // Using name as identifier
     }
+
+    return deviceInfo
   } catch (error) {
-    if ((error as Error).name === 'NotFoundError') {
-      throw new Error('No device selected')
+    const err = error as Error
+    if (err.name === 'NotFoundError') {
+      throw new Error('No device selected. Please select a device to connect.')
     }
-    throw error
+    if (err.name === 'NotSupportedError') {
+      throw new Error('Bluetooth not supported. Try Chrome on Android or desktop.')
+    }
+    if (err.name === 'SecurityError') {
+      throw new Error('Bluetooth access denied. Please enable Bluetooth permissions.')
+    }
+    throw new Error(`Bluetooth error: ${err.message}`)
   }
 }
 
-export const connectToDevice = async () => {
-  const device = await navigator.bluetooth.requestDevice({
-    acceptAllDevices: true,
-    optionalServices: [SERVICE_UUID]
-  })
+export const connectToDevice = async (deviceName?: string) => {
+  if (!isBluetoothAvailable()) {
+    throw new Error('Bluetooth not supported')
+  }
 
-  const server = await device.gatt?.connect()
-  if (!server) throw new Error('Failed to connect to GATT server')
+  try {
+    const options: RequestDeviceOptions = {
+      acceptAllDevices: true,
+      optionalServices: [SERVICE_UUID]
+    }
 
-  return server
+    // If device name provided, filter by name
+    if (deviceName) {
+      options.acceptAllDevices = false
+      options.filters = [{ name: deviceName }]
+    }
+
+    const device = await navigator.bluetooth.requestDevice(options)
+    const server = await device.gatt?.connect()
+    
+    if (!server) {
+      throw new Error('Failed to connect to device')
+    }
+
+    return { device, server }
+  } catch (error) {
+    throw new Error(`Connection failed: ${(error as Error).message}`)
+  }
 }
 
-export const sendBluetoothMessage = async (server: BluetoothRemoteGATTServer, message: string) => {
+export const sendBluetoothMessage = async (
+  server: BluetoothRemoteGATTServer, 
+  message: string
+): Promise<boolean> => {
   try {
     const service = await server.getPrimaryService(SERVICE_UUID)
     const characteristic = await service.getCharacteristic(CHARACTERISTIC_UUID)
@@ -68,20 +107,29 @@ export const sendBluetoothMessage = async (server: BluetoothRemoteGATTServer, me
 export const listenForBluetoothMessages = async (
   server: BluetoothRemoteGATTServer,
   callback: (message: string) => void
-) => {
+): Promise<() => void> => {
   try {
     const service = await server.getPrimaryService(SERVICE_UUID)
     const characteristic = await service.getCharacteristic(CHARACTERISTIC_UUID)
     
-    characteristic.addEventListener('characteristicvaluechanged', (event: Event) => {
+    const handler = (event: Event) => {
       const target = event.target as BluetoothRemoteGATTCharacteristic
-      const decoder = new TextDecoder()
-      const message = decoder.decode(target.value)
-      callback(message)
-    })
+      if (target.value) {
+        const decoder = new TextDecoder()
+        const message = decoder.decode(target.value)
+        callback(message)
+      }
+    }
     
+    characteristic.addEventListener('characteristicvaluechanged', handler)
     await characteristic.startNotifications()
+    
+    // Return cleanup function
+    return () => {
+      characteristic.removeEventListener('characteristicvaluechanged', handler)
+    }
   } catch (error) {
     console.error('Bluetooth listen error:', error)
+    return () => {}
   }
 }

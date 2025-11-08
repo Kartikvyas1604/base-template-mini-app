@@ -1,6 +1,7 @@
 export interface NFCData {
-  id: string
-  message: string
+  address: string
+  sessionId: string
+  timestamp: number
 }
 
 export const isNFCAvailable = () => {
@@ -9,7 +10,7 @@ export const isNFCAvailable = () => {
 
 export const readNFCTag = async (): Promise<NFCData> => {
   if (!isNFCAvailable()) {
-    throw new Error('NFC not supported on this device')
+    throw new Error('NFC not supported. Please use Chrome on Android.')
   }
 
   try {
@@ -19,51 +20,82 @@ export const readNFCTag = async (): Promise<NFCData> => {
 
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
-        reject(new Error('NFC scan timeout'))
+        reject(new Error('NFC scan timeout - no tag detected'))
       }, 30000)
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ndef.addEventListener('reading', ({ message, serialNumber }: any) => {
+      ndef.addEventListener('reading', ({ message }: any) => {
         clearTimeout(timeout)
         
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const textRecord = message.records.find((record: any) => record.recordType === 'text')
-        const decoder = new TextDecoder()
-        const messageText = textRecord ? decoder.decode(textRecord.data) : 'Connection'
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const textRecord = message.records.find((record: any) => record.recordType === 'text')
+          
+          if (!textRecord) {
+            reject(new Error('No text data found in NFC tag'))
+            return
+          }
 
-        resolve({
-          id: serialNumber,
-          message: messageText
-        })
+          const decoder = new TextDecoder()
+          const messageText = decoder.decode(textRecord.data)
+          
+          // Parse the JSON data from NFC tag
+          const data = JSON.parse(messageText)
+          
+          if (!data.address || !data.sessionId) {
+            reject(new Error('Invalid NFC data format'))
+            return
+          }
+
+          resolve({
+            address: data.address,
+            sessionId: data.sessionId,
+            timestamp: data.timestamp || Date.now()
+          })
+        } catch (error) {
+          console.error('NFC parse error:', error)
+          reject(new Error('Failed to parse NFC data'))
+        }
       })
 
       ndef.addEventListener('readingerror', () => {
         clearTimeout(timeout)
-        reject(new Error('Failed to read NFC tag'))
+        reject(new Error('Failed to read NFC tag - permission denied or hardware error'))
       })
     })
   } catch (error) {
-    if ((error as Error).name === 'NotAllowedError') {
-      throw new Error('NFC permission denied')
+    const err = error as Error
+    if (err.name === 'NotAllowedError') {
+      throw new Error('NFC permission denied. Please allow NFC access in your browser settings.')
     }
-    throw error
+    if (err.name === 'NotSupportedError') {
+      throw new Error('NFC not supported on this device. Use Android with Chrome.')
+    }
+    throw new Error(`NFC error: ${err.message}`)
   }
 }
 
-export const writeNFCTag = async (message: string): Promise<boolean> => {
+export const writeNFCTag = async (address: string, sessionId: string): Promise<boolean> => {
   if (!isNFCAvailable()) {
     throw new Error('NFC not supported on this device')
   }
 
   try {
+    const data = JSON.stringify({
+      address,
+      sessionId,
+      timestamp: Date.now()
+    })
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const ndef = new (window as any).NDEFReader()
     await ndef.write({
-      records: [{ recordType: 'text', data: message }]
+      records: [{ recordType: 'text', data }]
     })
     return true
-  } catch {
-    return false
+  } catch (error) {
+    console.error('NFC write error:', error)
+    throw new Error(`Failed to write NFC tag: ${(error as Error).message}`)
   }
 }
 
