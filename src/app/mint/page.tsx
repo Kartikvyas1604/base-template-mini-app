@@ -8,21 +8,7 @@ import NFTPreview from '~/components/NFTPreview'
 import SuccessAnimation from '~/components/SuccessAnimation'
 import { createNFTMetadata, uploadToIPFS } from '~/lib/ipfs'
 import { triggerHaptic, hapticPatterns } from '~/lib/haptic'
-import { CONTRACT_ADDRESS } from '~/lib/constants'
-
-const CONTRACT_ABI = [
-  {
-    inputs: [
-      { name: 'to', type: 'address' },
-      { name: 'metadataURI', type: 'string' },
-      { name: 'connectionMethod', type: 'string' }
-    ],
-    name: 'mintConnection',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function'
-  }
-] as const
+import { CONTRACT_ADDRESS, CONTRACT_ABI } from '~/lib/contract'
 
 function MintContent() {
   const router = useRouter()
@@ -68,13 +54,6 @@ function MintContent() {
       return
     }
 
-    if (CONTRACT_ADDRESS === '0x0000000000000000000000000000000000000000') {
-      setError('Contract not deployed. Please deploy contract and update .env')
-      triggerHaptic(hapticPatterns.error)
-      setStatus('error')
-      return
-    }
-
     try {
       setStatus('uploading')
       triggerHaptic(hapticPatterns.medium)
@@ -85,10 +64,10 @@ function MintContent() {
       triggerHaptic(hapticPatterns.medium)
 
       writeContract({
-        address: CONTRACT_ADDRESS as `0x${string}`,
+        address: CONTRACT_ADDRESS,
         abi: CONTRACT_ABI,
         functionName: 'mintConnection',
-        args: [address as `0x${string}`, uri, method]
+        args: [address, uri, method]
       })
 
     } catch (err) {

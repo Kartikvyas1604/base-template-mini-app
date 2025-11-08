@@ -1,0 +1,32 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse"
+      gradientTransform="translate(32 32) scale(32)">
+      <stop offset="0" stop-color="#00FFA3" stop-opacity="0.8"/>
+      <stop offset="1" stop-color="#00E0FF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="mint" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#00FFA3"/>
+      <stop offset="1" stop-color="#00E0FF"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="64" height="64" rx="12" fill="#0a0e1a"/>
+  
+  <!-- Glow backdrop -->
+  <circle cx="32" cy="32" r="28" fill="url(#glow)" />
+
+  <!-- Icon: stylized "tap signal" mint mark -->
+  <circle cx="32" cy="32" r="8" fill="url(#mint)" />
+  <circle cx="32" cy="32" r="15" stroke="url(#mint)" stroke-width="2.5" opacity="0.8"/>
+  <circle cx="32" cy="32" r="22" stroke="url(#mint)" stroke-width="2" opacity="0.4"/>
+  <path d="M25 20 L39 44" stroke="url(#mint)" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
+  
+  <!-- Green Status Dot (top right) -->
+  <circle cx="52" cy="12" r="6" fill="#10b981" opacity="0.9"/>
+  <circle cx="52" cy="12" r="6" fill="#10b981">
+    <animate attributeName="opacity" values="0.9;0.5;0.9" dur="2s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="52" cy="12" r="4" fill="#34d399"/>
+</svg>

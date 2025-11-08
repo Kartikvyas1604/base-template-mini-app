@@ -44,4 +44,8 @@ interface BluetoothRemoteGATTCharacteristic extends EventTarget {
 interface Window {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   NDEFReader: any
+  phantom?: {
+    ethereum?: unknown
+  }
+  rainbow?: unknown
 }

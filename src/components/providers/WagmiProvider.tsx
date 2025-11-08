@@ -1,8 +1,8 @@
 import { createConfig, http, WagmiProvider } from "wagmi";
-import { base, degen, mainnet, optimism, unichain, celo } from "wagmi/chains";
+import { baseSepolia } from "wagmi/chains";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { farcasterFrame } from "@farcaster/frame-wagmi-connector";
-import { coinbaseWallet, metaMask } from 'wagmi/connectors';
+import { coinbaseWallet, metaMask, walletConnect, injected } from 'wagmi/connectors';
 import { APP_NAME, APP_ICON_URL, APP_URL } from "~/lib/constants";
 import { useEffect, useState } from "react";
 import { useConnect, useAccount } from "wagmi";
@@ -42,14 +42,9 @@ function useCoinbaseWalletAutoConnect() {
 }
 
 export const config = createConfig({
-  chains: [base, optimism, mainnet, degen, unichain, celo],
+  chains: [baseSepolia],
   transports: {
-    [base.id]: http(),
-    [optimism.id]: http(),
-    [mainnet.id]: http(),
-    [degen.id]: http(),
-    [unichain.id]: http(),
-    [celo.id]: http(),
+    [baseSepolia.id]: http(),
   },
   connectors: [
     farcasterFrame(),
@@ -64,6 +59,18 @@ export const config = createConfig({
         url: APP_URL,
       },
     }),
+    walletConnect({
+      projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || 'demo-project-id',
+      metadata: {
+        name: APP_NAME,
+        description: 'Connect physically, mint digitally',
+        url: APP_URL,
+        icons: [APP_ICON_URL],
+      },
+      showQrModal: true,
+    }),
+    injected({ target: 'phantom' }),
+    injected({ target: 'rainbow' }),
   ],
 });
 
