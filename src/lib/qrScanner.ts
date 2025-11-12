@@ -5,9 +5,17 @@ export const startQRScanner = async (
   onSuccess: (data: QRConnectionData) => void,
   onError: (error: string) => void
 ): Promise<() => void> => {
+  let stream: MediaStream | null = null
+  let scanning = true
+
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'environment' }
+    // Request camera with better constraints
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { 
+        facingMode: 'environment',
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      }
     })
 
     videoElement.srcObject = stream
@@ -20,10 +28,13 @@ export const startQRScanner = async (
       throw new Error('Canvas context not available')
     }
 
-    let scanning = true
+    console.log('📷 QR Scanner started - scanning continuously...')
 
     const scanFrame = () => {
-      if (!scanning) return
+      if (!scanning) {
+        console.log('📷 Scanner stopped')
+        return
+      }
 
       if (videoElement.readyState === videoElement.HAVE_ENOUGH_DATA) {
         canvas.width = videoElement.videoWidth
@@ -34,28 +45,53 @@ export const startQRScanner = async (
         const code = detectQRCode(imageData)
 
         if (code) {
+          console.log('📷 QR Code detected:', code.substring(0, 50) + '...')
           const parsed = parseQRData(code)
           if (parsed) {
+            console.log('✅ Valid TapMint QR data:', parsed)
             scanning = false
-            stopTracks(stream)
+            if (stream) stopTracks(stream)
             onSuccess(parsed)
             return
+          } else {
+            console.log('⚠️ Invalid QR data format, continuing scan...')
           }
         }
       }
 
+      // Keep scanning
       requestAnimationFrame(scanFrame)
     }
 
+    // Start scanning
     scanFrame()
 
+    // Return cleanup function
     return () => {
+      console.log('🛑 Cleaning up scanner...')
       scanning = false
-      stopTracks(stream)
+      if (stream) stopTracks(stream)
     }
   } catch (error) {
-    onError((error as Error).message)
-    return () => {}
+    const err = error as Error
+    console.error('❌ Scanner error:', err)
+    
+    let errorMessage = 'Camera access failed'
+    if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+      errorMessage = 'Camera permission denied. Please allow camera access.'
+    } else if (err.name === 'NotFoundError') {
+      errorMessage = 'No camera found on this device.'
+    } else if (err.name === 'NotReadableError') {
+      errorMessage = 'Camera is already in use by another app.'
+    } else {
+      errorMessage = err.message
+    }
+    
+    onError(errorMessage)
+    
+    return () => {
+      if (stream) stopTracks(stream)
+    }
   }
 }
 
@@ -70,12 +106,14 @@ const detectQRCode = (imageData: ImageData): string | null => {
     const jsQR = (window as { jsQR?: (data: Uint8ClampedArray, width: number, height: number, options?: unknown) => { data: string } | null }).jsQR
     if (!jsQR) return null
 
+    // Try with better detection options
     const code = jsQR(imageData.data, imageData.width, imageData.height, {
-      inversionAttempts: 'dontInvert'
+      inversionAttempts: 'attemptBoth' // Try both normal and inverted
     })
 
     return code ? code.data : null
-  } catch {
+  } catch (error) {
+    console.error('QR detection error:', error)
     return null
   }
 }

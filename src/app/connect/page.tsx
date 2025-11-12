@@ -30,15 +30,25 @@ export default function ConnectPage() {
   }
 
   const handleQRGenerate = (data: QRConnectionData) => {
-    console.log('QR generated:', data)
-    setTimeout(() => {
-      router.push(`/session?method=qr&sessionId=${data.sessionId}`)
-    }, 2000)
+    console.log('📷 QR generated:', data)
+    // Don't navigate - let user show QR code to other person
+    // They'll navigate when ready via the "Continue" button
   }
 
   const handleQRScan = (data: QRConnectionData) => {
-    console.log('QR scanned:', data)
-    router.push(`/session?method=qr&sessionId=${data.sessionId}&peer=${data.address}`)
+    console.log('✅ QR scanned successfully:', data)
+    
+    // Validate data before navigating
+    if (!data.address || !data.sessionId) {
+      console.error('❌ Invalid QR data:', data)
+      return
+    }
+    
+    console.log('🔄 Navigating to session with peer:', data.address)
+    // Navigate after successful scan with slight delay
+    setTimeout(() => {
+      router.push(`/session?method=qr&sessionId=${data.sessionId}&peer=${encodeURIComponent(data.address)}`)
+    }, 500)
   }
 
   if (selectedMethod === 'bluetooth') {
