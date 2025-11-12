@@ -125,15 +125,58 @@ export const loadQRScanner = (): Promise<void> => {
       return
     }
 
+    // Check if already loaded
     if ((window as { jsQR?: unknown }).jsQR) {
+      console.log('✅ jsQR already loaded')
       resolve()
+      return
+    }
+
+    console.log('📥 Loading jsQR library...')
+
+    // Check if script tag already exists
+    const existingScript = document.querySelector('script[src*="jsqr"]')
+    if (existingScript) {
+      console.log('⏳ jsQR script already in DOM, waiting...')
+      // Wait a bit for it to load
+      const checkInterval = setInterval(() => {
+        if ((window as { jsQR?: unknown }).jsQR) {
+          clearInterval(checkInterval)
+          console.log('✅ jsQR loaded from existing script')
+          resolve()
+        }
+      }, 100)
+      
+      // Timeout after 5 seconds
+      setTimeout(() => {
+        clearInterval(checkInterval)
+        if (!(window as { jsQR?: unknown }).jsQR) {
+          reject(new Error('Timeout loading QR scanner'))
+        }
+      }, 5000)
       return
     }
 
     const script = document.createElement('script')
     script.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js'
-    script.onload = () => resolve()
-    script.onerror = () => reject(new Error('Failed to load QR scanner'))
+    script.async = true
+    
+    script.onload = () => {
+      console.log('✅ jsQR library loaded successfully')
+      // Double check it's actually available
+      if ((window as { jsQR?: unknown }).jsQR) {
+        resolve()
+      } else {
+        reject(new Error('jsQR loaded but not found on window'))
+      }
+    }
+    
+    script.onerror = (error) => {
+      console.error('❌ Failed to load jsQR:', error)
+      reject(new Error('Failed to load QR scanner library from CDN'))
+    }
+    
     document.head.appendChild(script)
+    console.log('📌 jsQR script tag added to page')
   })
 }

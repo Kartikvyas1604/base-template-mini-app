@@ -37,17 +37,32 @@ export default function QRConnect({ mode, onGenerate, onScan }: QRConnectProps) 
     
     if (mode === 'scan') {
       setScanStatus('Loading scanner library...')
-      loadQRScanner()
-        .then(() => {
-          setScannerReady(true)
-          setScanStatus('Scanner ready!')
-          console.log('✅ QR Scanner library loaded')
-        })
-        .catch(err => {
-          setError('Failed to load scanner: ' + (err as Error).message)
-          setScanStatus('Scanner failed to load')
-          console.error('❌ Failed to load scanner:', err)
-        })
+      
+      // Try to load with retry
+      const attemptLoad = async (retries = 3) => {
+        for (let i = 0; i < retries; i++) {
+          try {
+            console.log(`📥 Loading scanner attempt ${i + 1}/${retries}`)
+            await loadQRScanner()
+            setScannerReady(true)
+            setScanStatus('Scanner ready!')
+            console.log('✅ QR Scanner library loaded and ready')
+            return
+          } catch (err) {
+            console.error(`❌ Load attempt ${i + 1} failed:`, err)
+            if (i === retries - 1) {
+              // Last attempt failed
+              setError('Failed to load scanner: ' + (err as Error).message + '. Try refreshing the page.')
+              setScanStatus('Scanner failed to load')
+            } else {
+              // Wait before retry
+              await new Promise(resolve => setTimeout(resolve, 1000))
+            }
+          }
+        }
+      }
+      
+      attemptLoad()
     } else {
       setScannerReady(false)
     }
@@ -332,6 +347,31 @@ export default function QRConnect({ mode, onGenerate, onScan }: QRConnectProps) 
           >
             {!scannerReady ? '⏳ Loading Scanner...' : '📷 Start Scanning QR Code'}
           </button>
+
+          {/* Retry button if scanner failed to load */}
+          {error && error.includes('Failed to load scanner') && (
+            <motion.button
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              onClick={() => {
+                setError('')
+                setScanStatus('Retrying...')
+                loadQRScanner()
+                  .then(() => {
+                    setScannerReady(true)
+                    setScanStatus('Scanner ready!')
+                    console.log('✅ Manual retry successful')
+                  })
+                  .catch(err => {
+                    setError('Retry failed: ' + (err as Error).message)
+                    setScanStatus('Still failed')
+                  })
+              }}
+              className="mt-3 w-full py-3 rounded-xl font-medium bg-yellow-600 hover:bg-yellow-700 text-white transition-all"
+            >
+              🔄 Retry Loading Scanner
+            </motion.button>
+          )}
         </>
       )}
     </motion.div>
