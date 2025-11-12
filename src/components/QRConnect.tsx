@@ -117,15 +117,21 @@ export default function QRConnect({ mode, onGenerate, onScan }: QRConnectProps) 
       return
     }
 
+    // Check if getUserMedia is supported
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setError('🌐 Camera not supported in this browser. Please use Chrome, Edge, or Safari.')
+      return
+    }
+
     console.log('🎬 Starting QR scan...')
     setScanning(true)
     setScanStarted(true)
     setError('')
-    setScanStatus('Starting camera...')
+    setScanStatus('Requesting camera access...')
     triggerHaptic(hapticPatterns.medium)
 
     try {
-      setScanStatus('Scanning for QR code...')
+      setScanStatus('Opening camera...')
       const cleanup = await startQRScanner(
         videoRef.current,
         (data) => {
@@ -268,9 +274,45 @@ export default function QRConnect({ mode, onGenerate, onScan }: QRConnectProps) 
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-4 p-3 rounded-lg bg-red-500/20 border border-red-500/30"
+          className="mb-4 p-4 rounded-lg bg-red-500/20 border border-red-500/30"
         >
-          <p className="text-sm text-red-200">{error}</p>
+          <p className="text-sm text-red-200 mb-2 font-semibold">❌ Camera Error</p>
+          <p className="text-sm text-red-200 mb-3">{error}</p>
+          
+          {error.includes('permission') && (
+            <div className="text-xs text-red-300 bg-red-500/10 p-2 rounded mt-2">
+              <strong>💡 How to fix:</strong>
+              <br />• Look for camera icon in browser address bar
+              <br />• Click it and select &quot;Allow&quot;
+              <br />• Refresh the page if needed
+            </div>
+          )}
+          
+          {error.includes('not supported') && (
+            <div className="text-xs text-red-300 bg-red-500/10 p-2 rounded mt-2">
+              <strong>💡 How to fix:</strong>
+              <br />• Use Chrome, Edge, or Safari browser
+              <br />• Make sure you&apos;re using HTTPS (not HTTP)
+            </div>
+          )}
+
+          {error.includes('already in use') && (
+            <div className="text-xs text-red-300 bg-red-500/10 p-2 rounded mt-2">
+              <strong>💡 How to fix:</strong>
+              <br />• Close other apps using the camera
+              <br />• Close other browser tabs with camera access
+              <br />• Restart your browser
+            </div>
+          )}
+
+          {error.includes('No camera found') && (
+            <div className="text-xs text-red-300 bg-red-500/10 p-2 rounded mt-2">
+              <strong>💡 How to fix:</strong>
+              <br />• Check if your device has a camera
+              <br />• Try a different device with a camera
+              <br />• Use QR Generate mode on this device instead
+            </div>
+          )}
         </motion.div>
       )}
 

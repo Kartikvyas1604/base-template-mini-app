@@ -9,17 +9,35 @@ export const startQRScanner = async (
   let scanning = true
 
   try {
-    // Request camera with better constraints
-    stream = await navigator.mediaDevices.getUserMedia({
-      video: { 
-        facingMode: 'environment',
-        width: { ideal: 1280 },
-        height: { ideal: 720 }
-      }
-    })
+    // Check if camera API is available
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      throw new Error('Camera API not supported in this browser. Please use Chrome, Edge, or Safari.')
+    }
+
+    console.log('📷 Requesting camera access...')
+    
+    // Try with ideal constraints first
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { 
+          facingMode: 'environment',
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
+      })
+    } catch {
+      console.log('⚠️ High quality failed, trying basic camera...')
+      // Fallback to basic constraints if ideal fails
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: true
+      })
+    }
+
+    console.log('✅ Camera access granted')
 
     videoElement.srcObject = stream
     await videoElement.play()
+    console.log('✅ Video stream started')
 
     const canvas = document.createElement('canvas')
     const context = canvas.getContext('2d')
@@ -75,16 +93,29 @@ export const startQRScanner = async (
   } catch (error) {
     const err = error as Error
     console.error('❌ Scanner error:', err)
+    console.error('Error name:', err.name)
+    console.error('Error message:', err.message)
     
     let errorMessage = 'Camera access failed'
+    
     if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-      errorMessage = 'Camera permission denied. Please allow camera access.'
-    } else if (err.name === 'NotFoundError') {
-      errorMessage = 'No camera found on this device.'
-    } else if (err.name === 'NotReadableError') {
-      errorMessage = 'Camera is already in use by another app.'
+      errorMessage = '🚫 Camera permission denied. Please click "Allow" when your browser asks for camera access.'
+    } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+      errorMessage = '📷 No camera found. Please check if your device has a camera and it\'s connected properly.'
+    } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+      errorMessage = '⚠️ Camera is already in use. Please close other apps using the camera and try again.'
+    } else if (err.name === 'OverconstrainedError') {
+      errorMessage = '⚙️ Camera settings not supported. Trying with basic settings...'
+      // Try again with simpler constraints
+      console.log('🔄 Retrying with basic camera settings...')
+    } else if (err.name === 'NotSupportedError') {
+      errorMessage = '🌐 Camera not supported in this browser. Please use Chrome, Edge, or Safari.'
+    } else if (err.name === 'SecurityError') {
+      errorMessage = '🔒 Camera access blocked by security settings. Please use HTTPS or allow camera in browser settings.'
+    } else if (err.message.includes('getUserMedia')) {
+      errorMessage = '🌐 Camera API not available. Please use a modern browser (Chrome, Edge, Safari).'
     } else {
-      errorMessage = err.message
+      errorMessage = `❌ Error: ${err.message}. Please refresh and try again.`
     }
     
     onError(errorMessage)
